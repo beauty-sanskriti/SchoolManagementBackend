@@ -1,0 +1,1075 @@
+// use prisma-next
+
+enum UserRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum VerificationType {
+  EMAIL
+  PHONE
+}
+
+enum SchoolStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AdmissionStatus {
+ APPLIED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  LEAVE
+}
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  SHORT_ANSWER
+  LONG_ANSWER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum FeeStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  GRADED
+  LATE
+}
+
+enum NotificationType {
+  GENERAL
+  ASSIGNMENT
+  ATTENDANCE
+  FEE
+  EXAM
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum BookIssueStatus {
+  ISSUED
+  RETURNED
+  OVERDUE
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionPaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+model School {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String?  @unique
+  phone     String?  @unique
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+
+  status    SchoolStatus @default(ACTIVE)
+
+  users           User[]
+  academicYears   AcademicYear[]
+  campuses        Campus[]
+  departments     Department[]
+  classes         Class[]
+  students        Student[]
+  teachers        Teacher[]
+  parents         Parent[]
+  admissions      Admission[]
+  exams           Exam[]
+  feeStructures   FeeStructure[]
+  courses         Course[]
+  notifications   Notification[]
+  conversations   Conversation[]
+  books           Book[]
+  buses           Bus[]
+  transportRoutes TransportRoute[]
+  drivers         Driver[]
+  hostels         Hostel[]
+  employees       Employee[]
+  subscriptions   Subscription[]
+  supportTickets  SupportTicket[]
+  settings        SchoolSetting[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  schoolId      Int
+  email         String   @unique
+  phone         String?  @unique
+  username      String?  @unique
+  name          String?
+  password      String
+  role          UserRole
+  emailVerified Boolean  @default(false)
+  phoneVerified Boolean  @default(false)
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  verifications Verification[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  sentMessages  Message[]
+  conversations ConversationParticipant[]
+  assignments   Assignment[] @relation("AssignmentCreator")
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Verification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  otp       String
+  type      VerificationType
+  expiresAt TimestamptzString
+  verified  Boolean          @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Session {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  token        String        @unique
+  ipAddress    String?
+  userAgent    String?
+  status       SessionStatus @default(ACTIVE)
+  expiresAt    TimestamptzString
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String
+  entity    String?
+  entityId  Int?
+  details   String?
+  ipAddress String?
+
+  user User? @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model AcademicYear {
+  id        Int      @id @default(autoincrement())
+  schoolId  Int
+  name      String
+  startDate String
+  endDate   String
+  isCurrent Boolean  @default(false)
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  classes Class[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Campus {
+  id        Int      @id @default(autoincrement())
+  schoolId  Int
+  name      String
+  code      String
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Department {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  code        String
+  description String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  teachers  Teacher[]
+  subjects  Subject[]
+  employees Employee[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Class {
+  id             Int      @id @default(autoincrement())
+  schoolId       Int
+  academicYearId Int
+  name           String
+  code           String?
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  sections      Section[]
+  students      Student[]
+  timetable     Timetable[]
+  attendance    Attendance[]
+  classSubjects ClassSubject[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Section {
+  id      Int     @id @default(autoincrement())
+  classId Int
+  name    String
+  code    String?
+
+  class Class @relation(fields: [classId], references: [id])
+
+  students  Student[]
+  timetable Timetable[]
+  attendance Attendance[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Subject {
+  id           Int     @id @default(autoincrement())
+  schoolId     Int
+  departmentId Int?
+  name         String
+  code         String
+  description  String?
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  classSubjects ClassSubject[]
+  teacherSubjects TeacherSubject[]
+  examSubjects ExamSubject[]
+  questions Question[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model ClassSubject {
+  id        Int @id @default(autoincrement())
+  classId   Int
+  subjectId Int
+
+  class   Class   @relation(fields: [classId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Student {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  userId      Int?    @unique
+  classId     Int?
+  sectionId   Int?
+  admissionNo String  @unique
+  rollNumber  String?
+  dateOfBirth String?
+  gender      String?
+  bloodGroup  String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+
+  school  School   @relation(fields: [schoolId], references: [id])
+  class   Class?   @relation(fields: [classId], references: [id])
+  section Section? @relation(fields: [sectionId], references: [id])
+
+  profile     StudentProfile?
+  documents   StudentDocument[]
+  attendances Attendance[]
+  results     Result[]
+  studentFees StudentFee[]
+  admissions  Admission[]
+  parents     ParentStudent[]
+  submissions AssignmentSubmission[]
+  examAttempts ExamAttempt[]
+  libraryIssues BookIssue[]
+  hostelAllocations HostelAllocation[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model StudentProfile {
+  id             Int     @id @default(autoincrement())
+  studentId      Int     @unique
+  fatherName     String?
+  motherName     String?
+  guardianName   String?
+  guardianPhone  String?
+  emergencyPhone String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model StudentDocument {
+  id        Int    @id @default(autoincrement())
+  studentId Int
+  name      String
+  fileUrl   String
+  fileType  String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Admission {
+  id          Int             @id @default(autoincrement())
+  schoolId    Int
+  studentId   Int?
+  applicationNo String        @unique
+  name        String
+  email       String?
+  phone       String?
+  classId     Int?
+  status      AdmissionStatus @default(APPLIED)
+  notes       String?
+
+  school School @relation(fields: [schoolId], references: [id])
+  student Student? @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Teacher {
+  id           Int     @id @default(autoincrement())
+  schoolId     Int
+  userId       Int?    @unique
+  departmentId Int?
+  employeeNo   String  @unique
+  joiningDate  String?
+  qualification String?
+  designation  String?
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  teacherSubjects TeacherSubject[]
+  timetable       Timetable[]
+  attendances     TeacherAttendance[]
+  assignments     Assignment[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model TeacherSubject {
+  id        Int @id @default(autoincrement())
+  teacherId Int
+  subjectId Int
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Timetable {
+  id        Int     @id @default(autoincrement())
+  schoolId  Int
+  classId   Int
+  sectionId Int?
+  teacherId Int?
+  subjectId Int
+  day       String
+  startTime String
+  endTime   String
+  room      String?
+
+  class   Class   @relation(fields: [classId], references: [id])
+  section Section? @relation(fields: [sectionId], references: [id])
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  studentId Int
+  classId   Int
+  sectionId Int?
+  date      String
+  status    AttendanceStatus
+  remarks   String?
+
+  student Student @relation(fields: [studentId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  section Section? @relation(fields: [sectionId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model TeacherAttendance {
+  id        Int              @id @default(autoincrement())
+  teacherId Int
+  date      String
+  status    AttendanceStatus
+  remarks   String?
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Exam {
+  id          Int        @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  description String?
+  startDate   String?
+  endDate     String?
+  status      ExamStatus @default(DRAFT)
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  subjects  ExamSubject[]
+  questions Question[]
+  attempts  ExamAttempt[]
+  results   Result[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model ExamSubject {
+  id        Int @id @default(autoincrement())
+  examId    Int
+  subjectId Int
+  maxMarks  Float
+  passMarks Float
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Question {
+  id       Int          @id @default(autoincrement())
+  examId   Int
+  subjectId Int
+  question String
+  type     QuestionType
+  marks    Float
+  options  String?
+  answer   String?
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  answers ExamAnswer[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model ExamAttempt {
+  id        Int     @id @default(autoincrement())
+  examId    Int
+  studentId Int
+  startedAt TimestamptzString
+  submittedAt TimestamptzString?
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  answers ExamAnswer[]
+
+  createdAt TimestamptzString @default(now())
+}
+
+model ExamAnswer {
+  id         Int     @id @default(autoincrement())
+  attemptId  Int
+  questionId Int
+  answer     String?
+  marks      Float?
+
+  attempt  ExamAttempt @relation(fields: [attemptId], references: [id])
+  question Question    @relation(fields: [questionId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Result {
+  id        Int   @id @default(autoincrement())
+  examId    Int
+  studentId Int
+  subjectId Int?
+  marks     Float
+  grade     String?
+  remarks   String?
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model FeeStructure {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  amount      Float
+  description String?
+  frequency   String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  studentFees StudentFee[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model StudentFee {
+  id             Int        @id @default(autoincrement())
+  studentId      Int
+  feeStructureId Int
+  amount         Float
+  paidAmount     Float      @default(0)
+  dueDate        String?
+  status         FeeStatus  @default(PENDING)
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
+
+  payments Payment[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Payment {
+  id           Int           @id @default(autoincrement())
+  studentFeeId Int?
+  amount       Float
+  transactionId String?      @unique
+  status       PaymentStatus @default(PENDING)
+  paymentMethod String?
+  receiptUrl   String?
+
+  studentFee StudentFee? @relation(fields: [studentFeeId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Assignment {
+  id          Int              @id @default(autoincrement())
+  schoolId    Int
+  teacherId   Int
+  creatorId   Int?
+  subjectId   Int?
+  classId     Int?
+  title       String
+  description String?
+  dueDate     String?
+  status      AssignmentStatus @default(DRAFT)
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  creator User? @relation("AssignmentCreator", fields: [creatorId], references: [id])
+
+  submissions AssignmentSubmission[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model AssignmentSubmission {
+  id           Int              @id @default(autoincrement())
+  assignmentId Int
+  studentId    Int
+  content      String?
+  fileUrl      String?
+  marks        Float?
+  feedback     String?
+  status       SubmissionStatus @default(PENDING)
+  submittedAt  TimestamptzString?
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+  student    Student    @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Parent {
+  id       Int     @id @default(autoincrement())
+  schoolId Int
+  userId   Int?    @unique
+  name     String
+  phone    String?
+  email    String?
+  address  String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  students ParentStudent[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model ParentStudent {
+  id        Int @id @default(autoincrement())
+  parentId  Int
+  studentId Int
+  relation  String?
+
+  parent  Parent  @relation(fields: [parentId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Course {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  description String?
+  teacherId   Int?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  lessons Lesson[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Lesson {
+  id       Int     @id @default(autoincrement())
+  courseId Int
+  title    String
+  content  String?
+  videoUrl String?
+  fileUrl  String?
+  position Int?
+
+  course Course @relation(fields: [courseId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Notification {
+  id        Int                  @id @default(autoincrement())
+  schoolId  Int
+  userId    Int
+  title     String
+  message   String
+  type      NotificationType    @default(GENERAL)
+  channel   NotificationChannel @default(IN_APP)
+  isRead    Boolean             @default(false)
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Conversation {
+  id       Int              @id @default(autoincrement())
+  schoolId Int
+  title    String?
+  type     ConversationType @default(DIRECT)
+
+  school       School @relation(fields: [schoolId], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model ConversationParticipant {
+  id             Int @id @default(autoincrement())
+  conversationId  Int
+  userId         Int
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Message {
+  id             Int    @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  message        String
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Book {
+  id            Int     @id @default(autoincrement())
+  schoolId      Int
+  title         String
+  author        String?
+  isbn          String?
+  category      String?
+  quantity      Int     @default(1)
+  availableQty  Int     @default(1)
+
+  school School @relation(fields: [schoolId], references: [id])
+  issues BookIssue[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model BookIssue {
+  id         Int             @id @default(autoincrement())
+  bookId     Int
+  studentId  Int
+  issueDate  String
+  returnDate String?
+  status     BookIssueStatus @default(ISSUED)
+
+  book    Book    @relation(fields: [bookId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  fine LibraryFine?
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model LibraryFine {
+  id          Int     @id @default(autoincrement())
+  issueId     Int     @unique
+  amount      Float
+  paidAmount  Float   @default(0)
+  isPaid      Boolean @default(false)
+
+  issue BookIssue @relation(fields: [issueId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Bus {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  number      String
+  registrationNo String @unique
+  capacity    Int?
+  driverId    Int?
+
+  school School @relation(fields: [schoolId], references: [id])
+  driver Driver? @relation(fields: [driverId], references: [id])
+
+  locations BusLocation[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model TransportRoute {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  startPoint  String?
+  endPoint    String?
+
+  school School @relation(fields: [schoolId], references: [id])
+  locations BusLocation[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Driver {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  phone       String?
+  licenseNo   String @unique
+
+  school School @relation(fields: [schoolId], references: [id])
+  buses  Bus[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model BusLocation {
+  id        Int     @id @default(autoincrement())
+  busId     Int
+  routeId   Int?
+  latitude  Float
+  longitude Float
+  recordedAt TimestamptzString @default(now())
+
+  bus   Bus            @relation(fields: [busId], references: [id])
+  route TransportRoute? @relation(fields: [routeId], references: [id])
+}
+
+model Hostel {
+  id          Int     @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  address     String?
+  description String?
+
+  school School @relation(fields: [schoolId], references: [id])
+  rooms  HostelRoom[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model HostelRoom {
+  id        Int     @id @default(autoincrement())
+  hostelId  Int
+  roomNo    String
+  capacity  Int
+  occupied  Int     @default(0)
+
+  hostel      Hostel @relation(fields: [hostelId], references: [id])
+  allocations HostelAllocation[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model HostelAllocation {
+  id        Int     @id @default(autoincrement())
+  roomId    Int
+  studentId Int
+  startDate String
+  endDate   String?
+
+  room    HostelRoom @relation(fields: [roomId], references: [id])
+  student Student    @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Employee {
+  id           Int     @id @default(autoincrement())
+  schoolId     Int
+  departmentId Int?
+  employeeNo   String  @unique
+  name         String
+  email        String?
+  phone        String?
+  designation  String?
+  salary       Float?
+  joiningDate  String?
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  leaves  Leave[]
+  payroll Payroll[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Leave {
+  id         Int         @id @default(autoincrement())
+  employeeId Int
+  startDate  String
+  endDate    String
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Payroll {
+  id           Int     @id @default(autoincrement())
+  employeeId   Int
+  month        String
+  basicSalary  Float
+  allowances   Float   @default(0)
+  deductions   Float   @default(0)
+  netSalary    Float
+  status       String?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Subscription {
+  id          Int                @id @default(autoincrement())
+  schoolId    Int
+  planName    String
+  amount      Float
+  startDate   String
+  endDate     String?
+  status      SubscriptionStatus @default(ACTIVE)
+
+  school School @relation(fields: [schoolId], references: [id])
+  payments SubscriptionPayment[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model SubscriptionPayment {
+  id             Int                       @id @default(autoincrement())
+  subscriptionId Int
+  amount         Float
+  transactionId  String?                   @unique
+  status         SubscriptionPaymentStatus @default(PENDING)
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model SupportTicket {
+  id          Int          @id @default(autoincrement())
+  schoolId    Int
+  subject     String
+  description String
+  status      TicketStatus @default(OPEN)
+  priority    String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model SchoolSetting {
+  id       Int    @id @default(autoincrement())
+  schoolId Int    @unique
+  settings String?
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
