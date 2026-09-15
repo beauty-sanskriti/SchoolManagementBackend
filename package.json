@@ -23,6 +23,7 @@
     "contract:emit": "prisma contract emit"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^6.0.3",
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/jwt": "^12.0.1",

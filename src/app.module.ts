@@ -17,6 +17,9 @@ import { StudentsModule } from './students/students.module.js';
 import { AdmissionsModule } from './admissions/admissions.module.js';
 import { TeachersModule } from './teachers/teachers.module.js';
 import { TimetableModule } from './timetable/timetable.module.js';
+import { AttendanceModule } from './attendance/attendance.module.js';
+import { ExamsModule } from './exams/exams.module.js';
+import { FeesModule } from './fees/fees.module.js';
 @Module({
   imports: [
     UsersModule,
@@ -26,6 +29,9 @@ import { TimetableModule } from './timetable/timetable.module.js';
     AdmissionsModule,
     TeachersModule,
     TimetableModule,
+    AttendanceModule,
+    ExamsModule,
+    FeesModule,
 
     AcademicYearsModule,
     CampusesModule,

@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { RolesGuard } from './roles.guard.js';
 import { VerificationController } from './verification/verification.controller.js';
@@ -34,6 +35,14 @@ import { VerificationService } from './verification/verification.service.js';
     AuthService,
     VerificationService,
     JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+  ],
+
+  exports: [
+    PassportModule,
+    JwtModule,
+    JwtAuthGuard,
     RolesGuard,
   ],
 })

@@ -16,14 +16,14 @@ export class VerificationController {
       type: 'EMAIL' | 'PHONE';
     },
   ) {
-    const verification = await this.verificationService.createOtp(
-      body.userId,
-      body.type,
-    );
+    const verification =
+      await this.verificationService.createOtp(
+        body.userId,
+        body.type,
+      );
 
     return {
-      message: 'OTP generated successfully',
-      otp: verification.otp,
+      message: 'OTP sent successfully',
       type: verification.type,
       expiresAt: verification.expiresAt,
     };

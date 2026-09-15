@@ -14,11 +14,12 @@ export class RegisterDto {
   @IsEmail()
   email: string;
 
+  @IsOptional()
   @IsString()
   @Matches(/^[0-9]{10}$/, {
     message: 'Phone number must be exactly 10 digits',
   })
-  phone: string;
+  phone?: string;
 
   @IsOptional()
   @IsString()

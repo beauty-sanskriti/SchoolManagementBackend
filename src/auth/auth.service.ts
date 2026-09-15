@@ -19,10 +19,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  // =========================
-  // REGISTER
-  // =========================
-
   async register(registerDto: RegisterDto) {
     const existingUser = await db.orm.public.User
       .where({
@@ -36,16 +32,18 @@ export class AuthService {
       );
     }
 
-    const existingPhone = await db.orm.public.User
-      .where({
-        phone: registerDto.phone,
-      })
-      .first();
+    if (registerDto.phone) {
+      const existingPhone = await db.orm.public.User
+        .where({
+          phone: registerDto.phone,
+        })
+        .first();
 
-    if (existingPhone) {
-      throw new ConflictException(
-        'Phone number is already registered',
-      );
+      if (existingPhone) {
+        throw new ConflictException(
+          'Phone number is already registered',
+        );
+      }
     }
 
     if (registerDto.username) {
@@ -80,22 +78,14 @@ export class AuthService {
       phoneVerified: false,
     });
 
-    const phoneVerification =
-      await this.verificationService.createOtp(
-        user.id,
-        'PHONE',
-      );
-
-    const emailVerification =
-      await this.verificationService.createOtp(
-        user.id,
-        'EMAIL',
-      );
+    await this.verificationService.createOtp(
+      user.id,
+      'EMAIL',
+    );
 
     return {
       message:
-        'Registration successful. Please verify your email and phone.',
-
+        'Registration successful. Please verify your email.',
       user: {
         id: user.id,
         email: user.email,
@@ -104,17 +94,8 @@ export class AuthService {
         name: user.name,
         role: user.role,
       },
-
-      developmentOtp: {
-        phone: phoneVerification.otp,
-        email: emailVerification.otp,
-      },
     };
   }
-
-  // =========================
-  // LOGIN
-  // =========================
 
   async login(
     login: string,
@@ -165,12 +146,9 @@ export class AuthService {
       );
     }
 
-    if (
-      !user.emailVerified ||
-      !user.phoneVerified
-    ) {
+    if (!user.emailVerified) {
       throw new UnauthorizedException(
-        'Please verify your email and phone first',
+        'Please verify your email first',
       );
     }
 
@@ -198,19 +176,11 @@ export class AuthService {
     };
   }
 
-  // =========================
-  // LOGOUT
-  // =========================
-
   async logout() {
     return {
       message: 'Logout successful',
     };
   }
-
-  // =========================
-  // FORGOT PASSWORD
-  // =========================
 
   async forgotPassword(email: string) {
     const user =
@@ -234,15 +204,10 @@ export class AuthService {
 
     return {
       message:
-        'Password reset OTP generated successfully',
-      developmentOtp: verification.otp,
+        'Password reset OTP sent successfully',
       expiresAt: verification.expiresAt,
     };
   }
-
-  // =========================
-  // RESET PASSWORD
-  // =========================
 
   async resetPassword(
     email: string,
@@ -315,10 +280,6 @@ export class AuthService {
     };
   }
 
-  // =========================
-  // CHANGE PASSWORD
-  // =========================
-
   async changePassword(
     userId: number,
     currentPassword: string,
@@ -381,10 +342,6 @@ export class AuthService {
     };
   }
 
-  // =========================
-  // REFRESH TOKEN
-  // =========================
-
   async refreshToken(
     refreshToken: string,
   ) {
@@ -424,10 +381,6 @@ export class AuthService {
       );
     }
   }
-
-  // =========================
-  // CREATE REFRESH TOKEN
-  // =========================
 
   async createRefreshToken(
     userId: number,
