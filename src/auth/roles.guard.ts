@@ -26,7 +26,6 @@ export class RolesGuard implements CanActivate {
         ],
       );
 
-    // Agar API par koi role requirement nahi hai
     if (!requiredRoles) {
       return true;
     }

@@ -21,8 +21,6 @@ export class AcademicYearsService {
     const schoolId =
       createAcademicYearDto.schoolId;
 
-    // School Admin can only create
-    // academic years for their own school
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       schoolId !== currentUser.schoolId
@@ -32,7 +30,6 @@ export class AcademicYearsService {
       );
     }
 
-    // Check whether school exists
     const school =
       await db.orm.public.School
         .where({
@@ -46,7 +43,6 @@ export class AcademicYearsService {
       );
     }
 
-    // Start date must be before end date
     if (
       new Date(createAcademicYearDto.startDate) >=
       new Date(createAcademicYearDto.endDate)
@@ -56,8 +52,6 @@ export class AcademicYearsService {
       );
     }
 
-    // Check duplicate academic year
-    // for the same school
     const existingAcademicYear =
       await db.orm.public.AcademicYear
         .where({
@@ -72,8 +66,6 @@ export class AcademicYearsService {
       );
     }
 
-    // If new academic year is current,
-    // make other years non-current
     if (
       createAcademicYearDto.isCurrent === true
     ) {
@@ -113,13 +105,10 @@ export class AcademicYearsService {
   async getAcademicYears(
     currentUser: any,
   ) {
-    // Super Admin can see all academic years
     if (currentUser.role === 'SUPER_ADMIN') {
       return db.orm.public.AcademicYear.all();
     }
 
-    // School Admin can only see
-    // academic years of their own school
     return db.orm.public.AcademicYear
       .where({
         schoolId: currentUser.schoolId,
@@ -145,8 +134,6 @@ export class AcademicYearsService {
       );
     }
 
-    // School Admin can only access
-    // their own school's academic years
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       academicYear.schoolId !== currentUser.schoolId
@@ -178,8 +165,6 @@ export class AcademicYearsService {
       );
     }
 
-    // School Admin can only update
-    // their own school's academic years
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       existingAcademicYear.schoolId !==
@@ -190,8 +175,6 @@ export class AcademicYearsService {
       );
     }
 
-    // Use existing dates if they are not
-    // included in the update request
     const startDate =
       updateAcademicYearDto.startDate ??
       existingAcademicYear.startDate;
@@ -200,7 +183,6 @@ export class AcademicYearsService {
       updateAcademicYearDto.endDate ??
       existingAcademicYear.endDate;
 
-    // Validate date range
     if (
       new Date(startDate) >=
       new Date(endDate)
@@ -210,7 +192,6 @@ export class AcademicYearsService {
       );
     }
 
-    // Check duplicate name
     if (updateAcademicYearDto.name) {
       const existingWithSameName =
         await db.orm.public.AcademicYear
@@ -232,8 +213,6 @@ export class AcademicYearsService {
       }
     }
 
-    // If this year becomes current,
-    // make other years non-current
     if (
       updateAcademicYearDto.isCurrent === true
     ) {
@@ -293,8 +272,6 @@ export class AcademicYearsService {
       );
     }
 
-    // School Admin can only delete
-    // their own school's academic years
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       existingAcademicYear.schoolId !==

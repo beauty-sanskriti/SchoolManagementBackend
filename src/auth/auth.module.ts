@@ -44,6 +44,7 @@ import { VerificationService } from './verification/verification.service.js';
     JwtModule,
     JwtAuthGuard,
     RolesGuard,
+    VerificationService,
   ],
 })
 export class AuthModule {}

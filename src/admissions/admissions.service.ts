@@ -260,4 +260,50 @@ export class AdmissionsService {
       );
     }
   }
+
+  // POST /admissions/:id/approve
+  async approve(id: number, currentUser: any) {
+    const admission = await this.updateStatus(
+      id,
+      'APPROVED',
+      currentUser,
+    );
+
+    return admission;
+  }
+
+  // POST /admissions/:id/reject
+  async reject(id: number, currentUser: any) {
+    return this.updateStatus(id, 'REJECTED', currentUser);
+  }
+
+  // POST /admissions/:id/create-account
+  async createAccount(id: number, currentUser: any) {
+    const admission = await this.getAdmission(id, currentUser);
+
+    if (admission.status !== 'APPROVED') {
+      throw new ConflictException(
+        'Admission must be approved before creating a student account',
+      );
+    }
+
+    if (admission.studentId) {
+      throw new ConflictException(
+        'A student record already exists for this admission',
+      );
+    }
+
+    const student = await db.orm.public.Student.create({
+      schoolId: admission.schoolId,
+      classId: admission.classId,
+      admissionNo: admission.applicationNo,
+      status: 'ACTIVE',
+    });
+
+    await db.orm.public.Admission
+      .where({ id })
+      .update({ studentId: student.id });
+
+    return student;
+  }
 }

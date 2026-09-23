@@ -19,7 +19,7 @@ enum SchoolStatus {
 }
 
 enum AdmissionStatus {
- APPLIED
+  APPLIED
   UNDER_REVIEW
   APPROVED
   REJECTED
@@ -90,6 +90,7 @@ enum NotificationChannel {
   EMAIL
   SMS
   PUSH
+  WHATSAPP
 }
 
 enum ConversationType {
@@ -136,17 +137,69 @@ enum SessionStatus {
   EXPIRED
 }
 
-model School {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String?  @unique
-  phone     String?  @unique
-  address   String?
-  city      String?
-  state     String?
-  country   String?
+enum InviteType {
+  SCHOOL_ADMIN
+  TEACHER
+  PARENT
+}
 
-  status    SchoolStatus @default(ACTIVE)
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum TwoFactorMethod {
+  AUTHENTICATOR
+  EMAIL
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum QuizStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AIRequestType {
+  CHAT
+  DOUBT_SOLVER
+  PERFORMANCE
+  ATTENDANCE_ANOMALY
+  TIMETABLE
+  REPORT_SUMMARY
+  RECOMMENDATION
+}
+
+model School {
+  id          Int          @id @default(autoincrement())
+  name        String
+  email       String?      @unique
+  phone       String?      @unique
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  status      SchoolStatus @default(ACTIVE)
 
   users           User[]
   academicYears   AcademicYear[]
@@ -157,10 +210,12 @@ model School {
   teachers        Teacher[]
   parents         Parent[]
   admissions      Admission[]
+  subjects        Subject[]
   exams           Exam[]
   feeStructures   FeeStructure[]
   courses         Course[]
   notifications   Notification[]
+  announcements   Announcement[]
   conversations   Conversation[]
   books           Book[]
   buses           Bus[]
@@ -170,7 +225,10 @@ model School {
   employees       Employee[]
   subscriptions   Subscription[]
   supportTickets  SupportTicket[]
-  settings        SchoolSetting[]
+  settings        SchoolSetting?
+  invites         Invite[]
+  reportJobs      ReportJob[]
+  aiRequests      AIRequest[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -178,7 +236,8 @@ model School {
 
 model User {
   id            Int      @id @default(autoincrement())
-  schoolId      Int
+  schoolId      Int?
+  userCode      String?  @unique
   email         String   @unique
   phone         String?  @unique
   username      String?  @unique
@@ -188,14 +247,23 @@ model User {
   emailVerified Boolean  @default(false)
   phoneVerified Boolean  @default(false)
 
-  school        School   @relation(fields: [schoolId], references: [id])
+  school        School?                    @relation(fields: [schoolId], references: [id])
   verifications Verification[]
   sessions      Session[]
   auditLogs     AuditLog[]
   notifications Notification[]
   sentMessages  Message[]
   conversations ConversationParticipant[]
-  assignments   Assignment[] @relation("AssignmentCreator")
+  assignments   Assignment[]               @relation("AssignmentCreator")
+  sentInvites   Invite[]                   @relation("InviteSender")
+  announcements Announcement[]             @relation("AnnouncementCreator")
+  reportJobs    ReportJob[]
+  aiRequests    AIRequest[]
+
+  student   Student?
+  teacher   Teacher?
+  parent    Parent?
+  twoFactor TwoFactorAuth?
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -216,13 +284,26 @@ model Verification {
 }
 
 model Session {
-  id           Int           @id @default(autoincrement())
-  userId       Int
-  token        String        @unique
-  ipAddress    String?
-  userAgent    String?
-  status       SessionStatus @default(ACTIVE)
-  expiresAt    TimestamptzString
+  id        Int           @id @default(autoincrement())
+  userId    Int
+  token     String        @unique
+  ipAddress String?
+  userAgent String?
+  status    SessionStatus @default(ACTIVE)
+  expiresAt TimestamptzString
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model TwoFactorAuth {
+  id         Int             @id @default(autoincrement())
+  userId     Int             @unique
+  method     TwoFactorMethod
+  secret     String?
+  enabled    Boolean         @default(false)
+  backupCodes String?
 
   user User @relation(fields: [userId], references: [id])
 
@@ -244,16 +325,33 @@ model AuditLog {
   createdAt TimestamptzString @default(now())
 }
 
-model AcademicYear {
-  id        Int      @id @default(autoincrement())
-  schoolId  Int
-  name      String
-  startDate String
-  endDate   String
-  isCurrent Boolean  @default(false)
+model Invite {
+  id         Int          @id @default(autoincrement())
+  schoolId   Int
+  senderId   Int
+  email      String
+  type       InviteType
+  status     InviteStatus @default(PENDING)
+  token      String       @unique
+  expiresAt  TimestamptzString
+  acceptedAt TimestamptzString?
 
   school School @relation(fields: [schoolId], references: [id])
+  sender User   @relation("InviteSender", fields: [senderId], references: [id])
 
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model AcademicYear {
+  id         Int      @id @default(autoincrement())
+  schoolId   Int
+  name       String
+  startDate  TimestamptzString
+  endDate    TimestamptzString
+  isCurrent  Boolean  @default(false)
+
+  school  School  @relation(fields: [schoolId], references: [id])
   classes Class[]
 
   createdAt TimestamptzString @default(now())
@@ -261,7 +359,7 @@ model AcademicYear {
 }
 
 model Campus {
-  id        Int      @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   schoolId  Int
   name      String
   code      String
@@ -283,8 +381,7 @@ model Department {
   code        String
   description String?
 
-  school School @relation(fields: [schoolId], references: [id])
-
+  school    School     @relation(fields: [schoolId], references: [id])
   teachers  Teacher[]
   subjects  Subject[]
   employees Employee[]
@@ -294,20 +391,20 @@ model Department {
 }
 
 model Class {
-  id             Int      @id @default(autoincrement())
+  id             Int @id @default(autoincrement())
   schoolId       Int
   academicYearId Int
   name           String
   code           String?
 
-  school       School       @relation(fields: [schoolId], references: [id])
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-
+  school        School       @relation(fields: [schoolId], references: [id])
+  academicYear  AcademicYear @relation(fields: [academicYearId], references: [id])
   sections      Section[]
   students      Student[]
   timetable     Timetable[]
   attendance    Attendance[]
   classSubjects ClassSubject[]
+  courses       Course[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -319,10 +416,9 @@ model Section {
   name    String
   code    String?
 
-  class Class @relation(fields: [classId], references: [id])
-
-  students  Student[]
-  timetable Timetable[]
+  class      Class        @relation(fields: [classId], references: [id])
+  students   Student[]
+  timetable  Timetable[]
   attendance Attendance[]
 
   createdAt TimestamptzString @default(now())
@@ -337,11 +433,14 @@ model Subject {
   code         String
   description  String?
 
-  department Department? @relation(fields: [departmentId], references: [id])
-  classSubjects ClassSubject[]
+  school          School          @relation(fields: [schoolId], references: [id])
+  department      Department?     @relation(fields: [departmentId], references: [id])
+  classSubjects   ClassSubject[]
   teacherSubjects TeacherSubject[]
-  examSubjects ExamSubject[]
-  questions Question[]
+  examSubjects    ExamSubject[]
+  questions       Question[]
+  timetable       Timetable[]
+  courses         Course[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -359,44 +458,49 @@ model ClassSubject {
 }
 
 model Student {
-  id          Int     @id @default(autoincrement())
-  schoolId    Int
-  userId      Int?    @unique
-  classId     Int?
-  sectionId   Int?
-  admissionNo String  @unique
-  rollNumber  String?
-  dateOfBirth String?
-  gender      String?
-  bloodGroup  String?
-  address     String?
-  city        String?
-  state       String?
-  country     String?
+  id           Int     @id @default(autoincrement())
+  schoolId     Int
+  userId       Int?    @unique
+  classId      Int?
+  sectionId    Int?
+  admissionNo  String  @unique
+  rollNumber   String?
+  dateOfBirth  TimestamptzString?
+  gender       String?
+  bloodGroup   String?
+  address      String?
+  city         String?
+  state        String?
+  country      String?
+  status       String?
 
-  school  School   @relation(fields: [schoolId], references: [id])
-  class   Class?   @relation(fields: [classId], references: [id])
-  section Section? @relation(fields: [sectionId], references: [id])
-
-  profile     StudentProfile?
-  documents   StudentDocument[]
-  attendances Attendance[]
-  results     Result[]
-  studentFees StudentFee[]
-  admissions  Admission[]
-  parents     ParentStudent[]
-  submissions AssignmentSubmission[]
-  examAttempts ExamAttempt[]
-  libraryIssues BookIssue[]
+  school            School              @relation(fields: [schoolId], references: [id])
+  user              User?               @relation(fields: [userId], references: [id])
+  class             Class?              @relation(fields: [classId], references: [id])
+  section           Section?            @relation(fields: [sectionId], references: [id])
+  profile           StudentProfile?
+  documents         StudentDocument[]
+  attendances       Attendance[]
+  results           Result[]
+  studentFees       StudentFee[]
+  admissions        Admission[]
+  parents           ParentStudent[]
+  submissions       AssignmentSubmission[]
+  examAttempts      ExamAttempt[]
+  libraryIssues     BookIssue[]
   hostelAllocations HostelAllocation[]
+  busAttendances    BusAttendance[]
+  enrollments       CourseEnrollment[]
+  medicalRecords    StudentMedicalRecord[]
+  disciplinaryRecords StudentDisciplinaryRecord[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
 
 model StudentProfile {
-  id             Int     @id @default(autoincrement())
-  studentId      Int     @unique
+  id             Int    @id @default(autoincrement())
+  studentId      Int    @unique
   fatherName     String?
   motherName     String?
   guardianName   String?
@@ -410,11 +514,12 @@ model StudentProfile {
 }
 
 model StudentDocument {
-  id        Int    @id @default(autoincrement())
-  studentId Int
-  name      String
-  fileUrl   String
-  fileType  String?
+  id           Int    @id @default(autoincrement())
+  studentId    Int
+  name         String
+  documentType String?
+  fileUrl      String
+  fileType     String?
 
   student Student @relation(fields: [studentId], references: [id])
 
@@ -422,18 +527,18 @@ model StudentDocument {
 }
 
 model Admission {
-  id          Int             @id @default(autoincrement())
-  schoolId    Int
-  studentId   Int?
-  applicationNo String        @unique
-  name        String
-  email       String?
-  phone       String?
-  classId     Int?
-  status      AdmissionStatus @default(APPLIED)
-  notes       String?
+  id            Int             @id @default(autoincrement())
+  schoolId      Int
+  studentId     Int?
+  applicationNo String          @unique
+  name          String
+  email         String?
+  phone         String?
+  classId       Int?
+  status        AdmissionStatus @default(APPLIED)
+  notes         String?
 
-  school School @relation(fields: [schoolId], references: [id])
+  school  School   @relation(fields: [schoolId], references: [id])
   student Student? @relation(fields: [studentId], references: [id])
 
   createdAt TimestamptzString @default(now())
@@ -441,18 +546,18 @@ model Admission {
 }
 
 model Teacher {
-  id           Int     @id @default(autoincrement())
-  schoolId     Int
-  userId       Int?    @unique
-  departmentId Int?
-  employeeNo   String  @unique
-  joiningDate  String?
+  id            Int    @id @default(autoincrement())
+  schoolId      Int
+  userId        Int?   @unique
+  departmentId  Int?
+  employeeNo    String @unique
+  joiningDate   TimestamptzString?
   qualification String?
-  designation  String?
+  designation   String?
 
-  school     School      @relation(fields: [schoolId], references: [id])
-  department Department? @relation(fields: [departmentId], references: [id])
-
+  school          School           @relation(fields: [schoolId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
+  department      Department?      @relation(fields: [departmentId], references: [id])
   teacherSubjects TeacherSubject[]
   timetable       Timetable[]
   attendances     TeacherAttendance[]
@@ -474,7 +579,7 @@ model TeacherSubject {
 }
 
 model Timetable {
-  id        Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   schoolId  Int
   classId   Int
   sectionId Int?
@@ -485,10 +590,10 @@ model Timetable {
   endTime   String
   room      String?
 
-  class   Class   @relation(fields: [classId], references: [id])
+  class   Class    @relation(fields: [classId], references: [id])
   section Section? @relation(fields: [sectionId], references: [id])
   teacher Teacher? @relation(fields: [teacherId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
+  subject Subject  @relation(fields: [subjectId], references: [id])
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -499,12 +604,16 @@ model Attendance {
   studentId Int
   classId   Int
   sectionId Int?
-  date      String
+  date      TimestamptzString
   status    AttendanceStatus
   remarks   String?
+  method    String?
+  deviceId  String?
+  latitude  Float?
+  longitude Float?
 
-  student Student @relation(fields: [studentId], references: [id])
-  class   Class   @relation(fields: [classId], references: [id])
+  student Student  @relation(fields: [studentId], references: [id])
+  class   Class    @relation(fields: [classId], references: [id])
   section Section? @relation(fields: [sectionId], references: [id])
 
   createdAt TimestamptzString @default(now())
@@ -514,9 +623,10 @@ model Attendance {
 model TeacherAttendance {
   id        Int              @id @default(autoincrement())
   teacherId Int
-  date      String
+  date      TimestamptzString
   status    AttendanceStatus
   remarks   String?
+  method    String?
 
   teacher Teacher @relation(fields: [teacherId], references: [id])
 
@@ -525,16 +635,15 @@ model TeacherAttendance {
 }
 
 model Exam {
-  id          Int        @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   schoolId    Int
   name        String
   description String?
-  startDate   String?
-  endDate     String?
-  status      ExamStatus @default(DRAFT)
+  startDate   TimestamptzString?
+  endDate     TimestamptzString?
+  status      ExamStatus  @default(DRAFT)
 
-  school School @relation(fields: [schoolId], references: [id])
-
+  school    School        @relation(fields: [schoolId], references: [id])
   subjects  ExamSubject[]
   questions Question[]
   attempts  ExamAttempt[]
@@ -548,29 +657,27 @@ model ExamSubject {
   id        Int @id @default(autoincrement())
   examId    Int
   subjectId Int
-  maxMarks  Float
-  passMarks Float
+  maxMarks  Int
+  passMarks Int
 
   exam    Exam    @relation(fields: [examId], references: [id])
   subject Subject @relation(fields: [subjectId], references: [id])
 
   createdAt TimestamptzString @default(now())
-  updatedAt temporal.updatedAtString()
 }
 
 model Question {
-  id       Int          @id @default(autoincrement())
-  examId   Int
+  id        Int          @id @default(autoincrement())
+  examId    Int
   subjectId Int
-  question String
-  type     QuestionType
-  marks    Float
-  options  String?
-  answer   String?
+  question  String
+  type      QuestionType
+  marks     Int
+  options   String?
+  answer    String?
 
-  exam    Exam    @relation(fields: [examId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
-
+  exam    Exam        @relation(fields: [examId], references: [id])
+  subject Subject     @relation(fields: [subjectId], references: [id])
   answers ExamAnswer[]
 
   createdAt TimestamptzString @default(now())
@@ -578,26 +685,25 @@ model Question {
 }
 
 model ExamAttempt {
-  id        Int     @id @default(autoincrement())
-  examId    Int
-  studentId Int
-  startedAt TimestamptzString
+  id          Int              @id @default(autoincrement())
+  examId      Int
+  studentId   Int
+  startedAt   TimestamptzString
   submittedAt TimestamptzString?
 
-  exam    Exam    @relation(fields: [examId], references: [id])
-  student Student @relation(fields: [studentId], references: [id])
-
+  exam    Exam        @relation(fields: [examId], references: [id])
+  student Student     @relation(fields: [studentId], references: [id])
   answers ExamAnswer[]
 
   createdAt TimestamptzString @default(now())
 }
 
 model ExamAnswer {
-  id         Int     @id @default(autoincrement())
+  id         Int    @id @default(autoincrement())
   attemptId  Int
   questionId Int
   answer     String?
-  marks      Float?
+  marks      Int?
 
   attempt  ExamAttempt @relation(fields: [attemptId], references: [id])
   question Question    @relation(fields: [questionId], references: [id])
@@ -606,13 +712,14 @@ model ExamAnswer {
 }
 
 model Result {
-  id        Int   @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   examId    Int
   studentId Int
   subjectId Int?
-  marks     Float
+  marks     Int
   grade     String?
   remarks   String?
+  rank      Int?
 
   exam    Exam    @relation(fields: [examId], references: [id])
   student Student @relation(fields: [studentId], references: [id])
@@ -622,15 +729,14 @@ model Result {
 }
 
 model FeeStructure {
-  id          Int     @id @default(autoincrement())
+  id          Int    @id @default(autoincrement())
   schoolId    Int
   name        String
-  amount      Float
+  amount      Int
   description String?
   frequency   String?
 
-  school School @relation(fields: [schoolId], references: [id])
-
+  school      School      @relation(fields: [schoolId], references: [id])
   studentFees StudentFee[]
 
   createdAt TimestamptzString @default(now())
@@ -638,31 +744,35 @@ model FeeStructure {
 }
 
 model StudentFee {
-  id             Int        @id @default(autoincrement())
-  studentId      Int
+  id           Int       @id @default(autoincrement())
+  studentId    Int
   feeStructureId Int
-  amount         Float
-  paidAmount     Float      @default(0)
-  dueDate        String?
-  status         FeeStatus  @default(PENDING)
+  amount       Int
+  paidAmount   Int       @default(0)
+  dueDate      TimestamptzString?
+  status       FeeStatus @default(PENDING)
+  discount     Int       @default(0)
+  scholarship  Int       @default(0)
+  lateFee      Int       @default(0)
 
   student      Student      @relation(fields: [studentId], references: [id])
   feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
-
-  payments Payment[]
+  payments     Payment[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
 
 model Payment {
-  id           Int           @id @default(autoincrement())
-  studentFeeId Int?
-  amount       Float
-  transactionId String?      @unique
-  status       PaymentStatus @default(PENDING)
-  paymentMethod String?
-  receiptUrl   String?
+  id              Int           @id @default(autoincrement())
+  studentFeeId    Int?
+  amount          Int
+  transactionId   String?       @unique
+  status          PaymentStatus @default(PENDING)
+  gateway         String?
+  gatewayOrderId  String?
+  gatewayPaymentId String?
+  receiptUrl      String?
 
   studentFee StudentFee? @relation(fields: [studentFeeId], references: [id])
 
@@ -675,16 +785,15 @@ model Assignment {
   schoolId    Int
   teacherId   Int
   creatorId   Int?
-  subjectId   Int?
   classId     Int?
+  subjectId   Int?
   title       String
   description String?
-  dueDate     String?
+  dueDate     TimestamptzString?
   status      AssignmentStatus @default(DRAFT)
 
-  teacher Teacher @relation(fields: [teacherId], references: [id])
-  creator User? @relation("AssignmentCreator", fields: [creatorId], references: [id])
-
+  teacher     Teacher               @relation(fields: [teacherId], references: [id])
+  creator     User?                 @relation("AssignmentCreator", fields: [creatorId], references: [id])
   submissions AssignmentSubmission[]
 
   createdAt TimestamptzString @default(now())
@@ -697,7 +806,7 @@ model AssignmentSubmission {
   studentId    Int
   content      String?
   fileUrl      String?
-  marks        Float?
+  marks        Int?
   feedback     String?
   status       SubmissionStatus @default(PENDING)
   submittedAt  TimestamptzString?
@@ -710,16 +819,14 @@ model AssignmentSubmission {
 }
 
 model Parent {
-  id       Int     @id @default(autoincrement())
-  schoolId Int
-  userId   Int?    @unique
-  name     String
-  phone    String?
-  email    String?
-  address  String?
+  id         Int    @id @default(autoincrement())
+  schoolId   Int
+  userId     Int    @unique
+  occupation String?
+  address    String?
 
-  school School @relation(fields: [schoolId], references: [id])
-
+  school   School         @relation(fields: [schoolId], references: [id])
+  user     User           @relation(fields: [userId], references: [id])
   students ParentStudent[]
 
   createdAt TimestamptzString @default(now())
@@ -727,10 +834,10 @@ model Parent {
 }
 
 model ParentStudent {
-  id        Int @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   parentId  Int
   studentId Int
-  relation  String?
+  relation  String
 
   parent  Parent  @relation(fields: [parentId], references: [id])
   student Student @relation(fields: [studentId], references: [id])
@@ -739,30 +846,96 @@ model ParentStudent {
 }
 
 model Course {
-  id          Int     @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   schoolId    Int
-  name        String
-  description String?
+  classId     Int?
+  subjectId   Int?
   teacherId   Int?
+  title       String
+  description String?
+  thumbnail   String?
+  status      CourseStatus @default(DRAFT)
 
-  school School @relation(fields: [schoolId], references: [id])
-
-  lessons Lesson[]
+  school      School            @relation(fields: [schoolId], references: [id])
+  class       Class?            @relation(fields: [classId], references: [id])
+  subject     Subject?          @relation(fields: [subjectId], references: [id])
+  lessons     Lesson[]
+  quizzes     Quiz[]
+  enrollments CourseEnrollment[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
 
 model Lesson {
-  id       Int     @id @default(autoincrement())
-  courseId Int
-  title    String
-  content  String?
-  videoUrl String?
-  fileUrl  String?
-  position Int?
+  id          Int     @id @default(autoincrement())
+  courseId    Int
+  title       String
+  description String?
+  videoUrl    String?
+  duration    Int?
+  position    Int
+  isPublished Boolean @default(false)
 
-  course Course @relation(fields: [courseId], references: [id])
+  course    Course           @relation(fields: [courseId], references: [id])
+  resources CourseResource[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model CourseResource {
+  id        Int    @id @default(autoincrement())
+  lessonId  Int
+  name      String
+  fileUrl   String
+  fileType  String?
+
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model Quiz {
+  id          Int         @id @default(autoincrement())
+  courseId    Int
+  title       String
+  description String?
+  status      QuizStatus  @default(DRAFT)
+  duration    Int?
+  totalMarks  Int?
+
+  course    Course         @relation(fields: [courseId], references: [id])
+  questions QuizQuestion[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model QuizQuestion {
+  id       Int    @id @default(autoincrement())
+  quizId   Int
+  question String
+  options  String?
+  answer   String?
+  marks    Int
+
+  quiz Quiz @relation(fields: [quizId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model CourseEnrollment {
+  id          Int              @id @default(autoincrement())
+  courseId    Int
+  studentId   Int
+  status      EnrollmentStatus @default(ACTIVE)
+  progress    Int              @default(0)
+  enrolledAt  TimestamptzString
+  completedAt TimestamptzString?
+
+  course  Course  @relation(fields: [courseId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -774,9 +947,9 @@ model Notification {
   userId    Int
   title     String
   message   String
-  type      NotificationType    @default(GENERAL)
+  type      NotificationType
   channel   NotificationChannel @default(IN_APP)
-  isRead    Boolean             @default(false)
+  isRead    Boolean              @default(false)
 
   school School @relation(fields: [schoolId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
@@ -785,13 +958,31 @@ model Notification {
   updatedAt temporal.updatedAtString()
 }
 
-model Conversation {
-  id       Int              @id @default(autoincrement())
-  schoolId Int
-  title    String?
-  type     ConversationType @default(DIRECT)
+model Announcement {
+  id          Int    @id @default(autoincrement())
+  schoolId    Int
+  creatorId   Int
+  title       String
+  message     String
+  targetRole  UserRole?
+  isEmergency Boolean @default(false)
+  isPublished Boolean @default(false)
+  publishAt   TimestamptzString?
 
-  school       School @relation(fields: [schoolId], references: [id])
+  school  School @relation(fields: [schoolId], references: [id])
+  creator User   @relation("AnnouncementCreator", fields: [creatorId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Conversation {
+  id        Int              @id @default(autoincrement())
+  schoolId  Int
+  title     String?
+  type      ConversationType @default(DIRECT)
+
+  school       School                   @relation(fields: [schoolId], references: [id])
   participants ConversationParticipant[]
   messages     Message[]
 
@@ -801,7 +992,7 @@ model Conversation {
 
 model ConversationParticipant {
   id             Int @id @default(autoincrement())
-  conversationId  Int
+  conversationId Int
   userId         Int
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
@@ -815,6 +1006,8 @@ model Message {
   conversationId Int
   senderId       Int
   message        String
+  attachmentUrl  String?
+  messageType    String?
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
   sender       User         @relation(fields: [senderId], references: [id])
@@ -823,16 +1016,18 @@ model Message {
 }
 
 model Book {
-  id            Int     @id @default(autoincrement())
-  schoolId      Int
-  title         String
-  author        String?
-  isbn          String?
-  category      String?
-  quantity      Int     @default(1)
-  availableQty  Int     @default(1)
+  id           Int    @id @default(autoincrement())
+  schoolId     Int
+  title        String
+  author       String?
+  isbn         String?
+  category     String?
+  barcode      String?
+  quantity     Int    @default(1)
+  availableQty Int    @default(1)
+  digitalUrl   String?
 
-  school School @relation(fields: [schoolId], references: [id])
+  school School      @relation(fields: [schoolId], references: [id])
   issues BookIssue[]
 
   createdAt TimestamptzString @default(now())
@@ -843,25 +1038,25 @@ model BookIssue {
   id         Int             @id @default(autoincrement())
   bookId     Int
   studentId  Int
-  issueDate  String
-  returnDate String?
+  issueDate  TimestamptzString
+  returnDate TimestamptzString?
   status     BookIssueStatus @default(ISSUED)
+  fine       Int?
 
-  book    Book    @relation(fields: [bookId], references: [id])
-  student Student @relation(fields: [studentId], references: [id])
-
-  fine LibraryFine?
+  book        Book        @relation(fields: [bookId], references: [id])
+  student     Student     @relation(fields: [studentId], references: [id])
+  libraryFine LibraryFine?
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
 
 model LibraryFine {
-  id          Int     @id @default(autoincrement())
-  issueId     Int     @unique
-  amount      Float
-  paidAmount  Float   @default(0)
-  isPaid      Boolean @default(false)
+  id         Int     @id @default(autoincrement())
+  issueId    Int     @unique
+  amount     Int
+  paidAmount Int     @default(0)
+  isPaid     Boolean @default(false)
 
   issue BookIssue @relation(fields: [issueId], references: [id])
 
@@ -870,30 +1065,31 @@ model LibraryFine {
 }
 
 model Bus {
-  id          Int     @id @default(autoincrement())
-  schoolId    Int
-  number      String
+  id             Int    @id @default(autoincrement())
+  schoolId       Int
+  number         String
   registrationNo String @unique
-  capacity    Int?
-  driverId    Int?
+  capacity       Int?
+  driverId       Int?
 
-  school School @relation(fields: [schoolId], references: [id])
-  driver Driver? @relation(fields: [driverId], references: [id])
-
-  locations BusLocation[]
+  school     School         @relation(fields: [schoolId], references: [id])
+  driver     Driver?        @relation(fields: [driverId], references: [id])
+  locations  BusLocation[]
+  attendance BusAttendance[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
 
 model TransportRoute {
-  id          Int     @id @default(autoincrement())
-  schoolId    Int
-  name        String
-  startPoint  String?
-  endPoint    String?
+  id         Int    @id @default(autoincrement())
+  schoolId   Int
+  name       String
+  startPoint String?
+  endPoint   String?
+  stops      String?
 
-  school School @relation(fields: [schoolId], references: [id])
+  school    School        @relation(fields: [schoolId], references: [id])
   locations BusLocation[]
 
   createdAt TimestamptzString @default(now())
@@ -901,11 +1097,11 @@ model TransportRoute {
 }
 
 model Driver {
-  id          Int     @id @default(autoincrement())
-  schoolId    Int
-  name        String
-  phone       String?
-  licenseNo   String @unique
+  id         Int    @id @default(autoincrement())
+  schoolId   Int
+  name       String
+  phone      String?
+  licenseNo  String @unique
 
   school School @relation(fields: [schoolId], references: [id])
   buses  Bus[]
@@ -915,39 +1111,58 @@ model Driver {
 }
 
 model BusLocation {
-  id        Int     @id @default(autoincrement())
-  busId     Int
-  routeId   Int?
-  latitude  Float
-  longitude Float
-  recordedAt TimestamptzString @default(now())
+  id         Int    @id @default(autoincrement())
+  busId      Int
+  routeId    Int?
+  latitude   Float
+  longitude  Float
+  recordedAt TimestamptzString
 
-  bus   Bus            @relation(fields: [busId], references: [id])
+  bus   Bus             @relation(fields: [busId], references: [id])
   route TransportRoute? @relation(fields: [routeId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+}
+
+model BusAttendance {
+  id        Int              @id @default(autoincrement())
+  busId     Int
+  studentId Int
+  date      TimestamptzString
+  status    AttendanceStatus
+  remarks   String?
+
+  bus     Bus     @relation(fields: [busId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
 }
 
 model Hostel {
-  id          Int     @id @default(autoincrement())
+  id          Int    @id @default(autoincrement())
   schoolId    Int
   name        String
   address     String?
   description String?
 
-  school School @relation(fields: [schoolId], references: [id])
-  rooms  HostelRoom[]
+  school  School       @relation(fields: [schoolId], references: [id])
+  rooms   HostelRoom[]
+  visitors HostelVisitor[]
+  mess    HostelMess[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
 }
 
 model HostelRoom {
-  id        Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   hostelId  Int
   roomNo    String
   capacity  Int
-  occupied  Int     @default(0)
+  occupied  Int    @default(0)
 
-  hostel      Hostel @relation(fields: [hostelId], references: [id])
+  hostel     Hostel             @relation(fields: [hostelId], references: [id])
   allocations HostelAllocation[]
 
   createdAt TimestamptzString @default(now())
@@ -955,11 +1170,11 @@ model HostelRoom {
 }
 
 model HostelAllocation {
-  id        Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   roomId    Int
   studentId Int
-  startDate String
-  endDate   String?
+  startDate TimestamptzString
+  endDate   TimestamptzString?
 
   room    HostelRoom @relation(fields: [roomId], references: [id])
   student Student    @relation(fields: [studentId], references: [id])
@@ -969,22 +1184,21 @@ model HostelAllocation {
 }
 
 model Employee {
-  id           Int     @id @default(autoincrement())
+  id           Int    @id @default(autoincrement())
   schoolId     Int
   departmentId Int?
-  employeeNo   String  @unique
+  employeeNo   String @unique
   name         String
   email        String?
   phone        String?
   designation  String?
-  salary       Float?
-  joiningDate  String?
+  salary       Int?
+  joiningDate  TimestamptzString?
 
   school     School      @relation(fields: [schoolId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])
-
-  leaves  Leave[]
-  payroll Payroll[]
+  leaves     Leave[]
+  payroll    Payroll[]
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
@@ -993,8 +1207,8 @@ model Employee {
 model Leave {
   id         Int         @id @default(autoincrement())
   employeeId Int
-  startDate  String
-  endDate    String
+  startDate  TimestamptzString
+  endDate    TimestamptzString
   reason     String?
   status     LeaveStatus @default(PENDING)
 
@@ -1005,14 +1219,14 @@ model Leave {
 }
 
 model Payroll {
-  id           Int     @id @default(autoincrement())
-  employeeId   Int
-  month        String
-  basicSalary  Float
-  allowances   Float   @default(0)
-  deductions   Float   @default(0)
-  netSalary    Float
-  status       String?
+  id          Int    @id @default(autoincrement())
+  employeeId  Int
+  month       String
+  basicSalary Int
+  allowances  Int    @default(0)
+  deductions  Int    @default(0)
+  netSalary   Int
+  status      String?
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
@@ -1020,16 +1234,35 @@ model Payroll {
   updatedAt temporal.updatedAtString()
 }
 
-model Subscription {
-  id          Int                @id @default(autoincrement())
-  schoolId    Int
-  planName    String
-  amount      Float
-  startDate   String
-  endDate     String?
-  status      SubscriptionStatus @default(ACTIVE)
+model SubscriptionPlan {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  description  String?
+  amount       Int
+  billingCycle String?
+  maxStudents  Int?
+  maxTeachers  Int?
+  features     String?
+  isActive     Boolean  @default(true)
 
-  school School @relation(fields: [schoolId], references: [id])
+  subscriptions Subscription[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Subscription {
+  id        Int                @id @default(autoincrement())
+  schoolId  Int
+  planId    Int?
+  planName  String
+  amount    Int
+  startDate TimestamptzString
+  endDate   TimestamptzString?
+  status    SubscriptionStatus @default(ACTIVE)
+
+  school   School              @relation(fields: [schoolId], references: [id])
+  plan     SubscriptionPlan?   @relation(fields: [planId], references: [id])
   payments SubscriptionPayment[]
 
   createdAt TimestamptzString @default(now())
@@ -1039,7 +1272,7 @@ model Subscription {
 model SubscriptionPayment {
   id             Int                       @id @default(autoincrement())
   subscriptionId Int
-  amount         Float
+  amount         Int
   transactionId  String?                   @unique
   status         SubscriptionPaymentStatus @default(PENDING)
 
@@ -1064,11 +1297,129 @@ model SupportTicket {
 }
 
 model SchoolSetting {
-  id       Int    @id @default(autoincrement())
-  schoolId Int    @unique
-  settings String?
+  id            Int    @id @default(autoincrement())
+  schoolId      Int    @unique
+  branding      String?
+  theme         String?
+  permissions   String?
+  integrations  String?
+  timezone      String?
+  currency      String?
+  logoUrl       String?
+  primaryColor  String?
+  secondaryColor String?
 
   school School @relation(fields: [schoolId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model ReportJob {
+  id          Int          @id @default(autoincrement())
+  schoolId    Int
+  createdById Int
+  name        String
+  type        String
+  filters     String?
+  fileUrl     String?
+  status      ReportStatus @default(QUEUED)
+  error       String?
+
+  school    School @relation(fields: [schoolId], references: [id])
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model AIRequest {
+  id         Int            @id @default(autoincrement())
+  schoolId   Int
+  userId     Int
+  type       AIRequestType
+  prompt     String
+  response   String?
+  metadata   String?
+  tokensUsed Int?
+  status     String?
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model StudentMedicalRecord {
+  id          Int    @id @default(autoincrement())
+  studentId   Int
+  condition   String?
+  bloodGroup  String?
+  allergies   String?
+  medications String?
+  notes       String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model StudentDisciplinaryRecord {
+  id           Int    @id @default(autoincrement())
+  studentId    Int
+  incidentDate TimestamptzString
+  title        String
+  description  String?
+  actionTaken  String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model Expense {
+  id          Int    @id @default(autoincrement())
+  schoolId    Int
+  title       String
+  category    String?
+  amount      Int
+  description String?
+  expenseDate TimestamptzString
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model HostelVisitor {
+  id          Int    @id @default(autoincrement())
+  hostelId    Int
+  visitorName String
+  phone       String?
+  purpose     String?
+  visitDate   TimestamptzString
+  checkIn     TimestamptzString?
+  checkOut    TimestamptzString?
+
+  hostel Hostel @relation(fields: [hostelId], references: [id])
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model HostelMess {
+  id          Int    @id @default(autoincrement())
+  hostelId    Int
+  mealDate    TimestamptzString
+  mealType    String
+  menu        String?
+  description String?
+
+  hostel Hostel @relation(fields: [hostelId], references: [id])
 
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()

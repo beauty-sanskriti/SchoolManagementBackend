@@ -4,15 +4,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import * as bcrypt from 'bcrypt';
+
 import { db } from '../prisma/db.js';
+
 import { CreateSchoolDto } from './dto/create-school.dto.js';
+import { CreateSchoolAdminDto } from './dto/create-school-admin.dto.js';
 import { UpdateSchoolDto } from './dto/update-school.dto.js';
 import { UpdateSchoolStatusDto } from './dto/update-school-status.dto.js';
 
 @Injectable()
 export class SchoolsService {
-
-  // POST /schools
   async createSchool(
     schoolData: CreateSchoolDto,
   ) {
@@ -43,12 +45,69 @@ export class SchoolsService {
     }
   }
 
-  // GET /schools
+  async createSchoolAdmin(
+    schoolId: number,
+    adminData: CreateSchoolAdminDto,
+  ) {
+    const school =
+      await db.orm.public.School
+        .where({
+          id: schoolId,
+        })
+        .first();
+
+    if (!school) {
+      throw new NotFoundException(
+        'School not found',
+      );
+    }
+
+    const existingUser =
+      await db.orm.public.User
+        .where({
+          email: adminData.email,
+        })
+        .first();
+
+    if (existingUser) {
+      throw new ConflictException(
+        'Email is already registered',
+      );
+    }
+
+    const hashedPassword =
+      await bcrypt.hash(
+        adminData.password,
+        10,
+      );
+
+    const user =
+      await db.orm.public.User.create({
+        schoolId,
+        email: adminData.email,
+        name: adminData.name,
+        password: hashedPassword,
+        role: 'SCHOOL_ADMIN',
+        emailVerified: true,
+        phoneVerified: false,
+      });
+
+    const {
+      password: _,
+      ...userWithoutPassword
+    } = user;
+
+    return {
+      message:
+        'School Admin created successfully',
+      user: userWithoutPassword,
+    };
+  }
+
   async getSchools() {
     return db.orm.public.School.all();
   }
 
-  // GET /schools/:id
   async getSchool(id: number) {
     const school =
       await db.orm.public.School
@@ -66,7 +125,6 @@ export class SchoolsService {
     return school;
   }
 
-  // PATCH /schools/:id
   async updateSchool(
     id: number,
     updateSchoolDto: UpdateSchoolDto,
@@ -115,7 +173,6 @@ export class SchoolsService {
     }
   }
 
-  // DELETE /schools/:id
   async deleteSchool(id: number) {
     const existingSchool =
       await db.orm.public.School
@@ -142,7 +199,6 @@ export class SchoolsService {
     };
   }
 
-  // GET /schools/:id/users
   async getSchoolUsers(id: number) {
     await this.getSchool(id);
 
@@ -158,7 +214,6 @@ export class SchoolsService {
     );
   }
 
-  // GET /schools/:id/students
   async getSchoolStudents(id: number) {
     await this.getSchool(id);
 
@@ -175,7 +230,6 @@ export class SchoolsService {
     );
   }
 
-  // GET /schools/:id/teachers
   async getSchoolTeachers(id: number) {
     await this.getSchool(id);
 
@@ -192,7 +246,6 @@ export class SchoolsService {
     );
   }
 
-  // PATCH /schools/:id/status
   async updateSchoolStatus(
     id: number,
     updateSchoolStatusDto: UpdateSchoolStatusDto,
@@ -222,5 +275,38 @@ export class SchoolsService {
       });
 
     return this.getSchool(id);
+  }
+
+  // GET /schools/:id/settings
+  async getSchoolSettings(id: number) {
+    const school = await this.getSchool(id);
+
+    const settings = await db.orm.public.SchoolSetting
+      .where({ schoolId: id })
+      .first();
+
+    return settings ?? { schoolId: school.id };
+  }
+
+  // PATCH /schools/:id/settings
+  async updateSchoolSettings(id: number, dto: Record<string, any>) {
+    await this.getSchool(id);
+
+    const existing = await db.orm.public.SchoolSetting
+      .where({ schoolId: id })
+      .first();
+
+    if (existing) {
+      await db.orm.public.SchoolSetting
+        .where({ id: existing.id })
+        .update({ ...dto });
+    } else {
+      await db.orm.public.SchoolSetting.create({
+        schoolId: id,
+        ...dto,
+      });
+    }
+
+    return this.getSchoolSettings(id);
   }
 }

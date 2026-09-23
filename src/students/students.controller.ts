@@ -23,7 +23,7 @@ import { Roles } from '../auth/roles.decorator.js';
 
 @Controller('students')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'SCHOOL_ADMIN')
+@Roles('SCHOOL_ADMIN')
 export class StudentsController {
   constructor(
     private readonly studentsService: StudentsService,
@@ -185,5 +185,50 @@ export class StudentsController {
       id,
       req.user,
     );
+  }
+
+  // POST /students/admit
+  @Post('admit')
+  admitStudent(
+    @Body() dto: any,
+    @Request() req: any,
+  ) {
+    return this.studentsService.admitStudent(dto, req.user);
+  }
+
+  // POST /students/bulk-import
+  @Post('bulk-import')
+  bulkImport(
+    @Body('students') students: any[],
+    @Request() req: any,
+  ) {
+    return this.studentsService.bulkImport(students, req.user);
+  }
+
+  // POST /students/:id/generate-account
+  @Post(':id/generate-account')
+  generateAccount(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.studentsService.generateAccount(id, req.user);
+  }
+
+  // GET /students/:id/id-card
+  @Get(':id/id-card')
+  getIdCard(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.studentsService.getIdCard(id, req.user);
+  }
+
+  // GET /students/:id/lifecycle
+  @Get(':id/lifecycle')
+  getLifecycle(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.studentsService.getLifecycle(id, req.user);
   }
 }

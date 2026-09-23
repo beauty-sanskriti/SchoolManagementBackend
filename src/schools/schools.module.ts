@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+
 import { PassportModule } from '@nestjs/passport';
 
 import { SchoolsController } from './schools.controller.js';

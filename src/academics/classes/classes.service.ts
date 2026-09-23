@@ -200,4 +200,55 @@ export class ClassesService {
       message: 'Class deleted successfully',
     };
   }
+
+  // GET /classes/:id/analytics
+  async analytics(id: number, currentUser: any) {
+    const classRecord = await db.orm.public.Class.where({ id }).first();
+
+    if (!classRecord) {
+      throw new NotFoundException('Class not found');
+    }
+
+    if (
+      currentUser.role === 'SCHOOL_ADMIN' &&
+      classRecord.schoolId !== currentUser.schoolId
+    ) {
+      throw new ForbiddenException(
+        'You can only access classes from your own school',
+      );
+    }
+
+    const students = await db.orm.public.Student
+      .where({ classId: id })
+      .all();
+
+    const studentIds = new Set(students.map((s) => s.id));
+
+    const allAttendance = await db.orm.public.Attendance.all();
+    const attendance = allAttendance.filter((a) => studentIds.has(a.studentId));
+
+    const present = attendance.filter((a) => a.status === 'PRESENT').length;
+    const attendanceRate =
+      attendance.length > 0
+        ? Math.round((present / attendance.length) * 10000) / 100
+        : 0;
+
+    const allResults = await db.orm.public.Result.all();
+    const results = allResults.filter((r) => studentIds.has(r.studentId));
+
+    const avgMarks =
+      results.length > 0
+        ? Math.round(
+            (results.reduce((sum, r) => sum + r.marks, 0) / results.length) *
+              100,
+          ) / 100
+        : 0;
+
+    return {
+      classId: id,
+      studentCount: students.length,
+      attendanceRate,
+      averageMarks: avgMarks,
+    };
+  }
 }

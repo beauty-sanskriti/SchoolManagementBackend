@@ -82,4 +82,13 @@ export class ClassesController {
       req.user,
     );
   }
+
+  // GET /classes/:id/analytics
+  @Get(':id/analytics')
+  analytics(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.classesService.analytics(id, req.user);
+  }
 }

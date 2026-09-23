@@ -690,4 +690,60 @@ export class ExamsService {
       results,
     };
   }
+
+  // GET /results/:id/report
+  async resultReport(id: number, user: any) {
+    const result = await db.orm.public.Result.where({ id }).first();
+
+    if (!result) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const exam = await db.orm.public.Exam.where({ id: result.examId }).first();
+    const student = await db.orm.public.Student.where({ id: result.studentId }).first();
+
+    return { result, exam, student };
+  }
+
+  // GET /results/analytics
+  async resultsAnalytics(user: any) {
+    const schoolId = this.getSchoolId(user);
+
+    const exams = await db.orm.public.Exam.where({ schoolId }).all();
+    const examIds = new Set(exams.map((e) => e.id));
+
+    const allResults = await db.orm.public.Result.all();
+    const results = allResults.filter((r) => examIds.has(r.examId));
+
+    const avgMarks =
+      results.length > 0
+        ? results.reduce((sum, r) => sum + r.marks, 0) / results.length
+        : 0;
+
+    return {
+      totalResults: results.length,
+      averageMarks: Math.round(avgMarks * 100) / 100,
+    };
+  }
+
+  // GET /results/rankings
+  async rankings(examId: number, user: any) {
+    const schoolId = this.getSchoolId(user);
+
+    const exam = await db.orm.public.Exam.where({ id: examId, schoolId }).first();
+
+    if (!exam) {
+      throw new NotFoundException('Exam not found');
+    }
+
+    const results = await db.orm.public.Result.where({ examId }).all();
+
+    const sorted = [...results].sort((a, b) => b.marks - a.marks);
+
+    return sorted.map((r, index) => ({
+      rank: index + 1,
+      studentId: r.studentId,
+      marks: r.marks,
+    }));
+  }
 }

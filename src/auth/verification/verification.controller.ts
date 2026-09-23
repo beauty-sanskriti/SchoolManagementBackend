@@ -12,13 +12,13 @@ export class VerificationController {
   async sendOtp(
     @Body()
     body: {
-      userId: number;
+      email: string;
       type: 'EMAIL' | 'PHONE';
     },
   ) {
     const verification =
       await this.verificationService.createOtp(
-        body.userId,
+        body.email,
         body.type,
       );
 
@@ -33,13 +33,13 @@ export class VerificationController {
   async verifyOtp(
     @Body()
     body: {
-      userId: number;
+      email: string;
       otp: string;
       type: 'EMAIL' | 'PHONE';
     },
   ) {
     return this.verificationService.verifyOtp(
-      body.userId,
+      body.email,
       body.otp,
       body.type,
     );

@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 
 import { AuthService } from './auth.service.js';
-import { RegisterDto } from './dto/register.dto/register.dto.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 
 @Controller('auth')
@@ -16,17 +15,6 @@ export class AuthController {
     private readonly authService: AuthService,
   ) {}
 
-  // REGISTER
-  @Post('register')
-  register(
-    @Body() registerDto: RegisterDto,
-  ) {
-    return this.authService.register(
-      registerDto,
-    );
-  }
-
-  // LOGIN
   @Post('login')
   async login(
     @Body()
@@ -52,14 +40,12 @@ export class AuthController {
     };
   }
 
-  // LOGOUT
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   logout() {
     return this.authService.logout();
   }
 
-  // FORGOT PASSWORD
   @Post('forgot-password')
   forgotPassword(
     @Body()
@@ -72,7 +58,6 @@ export class AuthController {
     );
   }
 
-  // RESET PASSWORD
   @Post('reset-password')
   resetPassword(
     @Body()
@@ -89,7 +74,6 @@ export class AuthController {
     );
   }
 
-  // CHANGE PASSWORD
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
   changePassword(
@@ -107,7 +91,6 @@ export class AuthController {
     );
   }
 
-  // REFRESH TOKEN
   @Post('refresh-token')
   refreshToken(
     @Body()

@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 
 import { SchoolsService } from './schools.service.js';
+
 import { CreateSchoolDto } from './dto/create-school.dto.js';
+import { CreateSchoolAdminDto } from './dto/create-school-admin.dto.js';
 import { UpdateSchoolDto } from './dto/update-school.dto.js';
 import { UpdateSchoolStatusDto } from './dto/update-school-status.dto.js';
 
@@ -27,7 +29,6 @@ export class SchoolsController {
     private readonly schoolsService: SchoolsService,
   ) {}
 
-  // POST /schools
   @Post()
   createSchool(
     @Body() createSchoolDto: CreateSchoolDto,
@@ -37,13 +38,22 @@ export class SchoolsController {
     );
   }
 
-  // GET /schools
+  @Post(':id/admin')
+  createSchoolAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() createSchoolAdminDto: CreateSchoolAdminDto,
+  ) {
+    return this.schoolsService.createSchoolAdmin(
+      id,
+      createSchoolAdminDto,
+    );
+  }
+
   @Get()
   getSchools() {
     return this.schoolsService.getSchools();
   }
 
-  // GET /schools/:id/users
   @Get(':id/users')
   getSchoolUsers(
     @Param('id', ParseIntPipe) id: number,
@@ -51,7 +61,6 @@ export class SchoolsController {
     return this.schoolsService.getSchoolUsers(id);
   }
 
-  // GET /schools/:id/students
   @Get(':id/students')
   getSchoolStudents(
     @Param('id', ParseIntPipe) id: number,
@@ -59,7 +68,6 @@ export class SchoolsController {
     return this.schoolsService.getSchoolStudents(id);
   }
 
-  // GET /schools/:id/teachers
   @Get(':id/teachers')
   getSchoolTeachers(
     @Param('id', ParseIntPipe) id: number,
@@ -67,12 +75,10 @@ export class SchoolsController {
     return this.schoolsService.getSchoolTeachers(id);
   }
 
-  // PATCH /schools/:id/status
   @Patch(':id/status')
   updateSchoolStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    updateSchoolStatusDto: UpdateSchoolStatusDto,
+    @Body() updateSchoolStatusDto: UpdateSchoolStatusDto,
   ) {
     return this.schoolsService.updateSchoolStatus(
       id,
@@ -80,15 +86,13 @@ export class SchoolsController {
     );
   }
 
-  // GET /schools/:id
-  @Get(':id')
+  // GET /schools/:id/settings
   getSchool(
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.schoolsService.getSchool(id);
   }
 
-  // PATCH /schools/:id
   @Patch(':id')
   updateSchool(
     @Param('id', ParseIntPipe) id: number,
@@ -100,7 +104,6 @@ export class SchoolsController {
     );
   }
 
-  // DELETE /schools/:id
   @Delete(':id')
   deleteSchool(
     @Param('id', ParseIntPipe) id: number,

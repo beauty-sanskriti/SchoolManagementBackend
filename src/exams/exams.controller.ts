@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -174,6 +175,27 @@ export class ExamsController {
   @Get('results')
   findAllResults(@Req() req: any) {
     return this.examsService.findAllResults(req.user);
+  }
+
+  // GET /results/analytics
+  @Get('results/analytics')
+  resultsAnalytics(@Req() req: any) {
+    return this.examsService.resultsAnalytics(req.user);
+  }
+
+  // GET /results/rankings?examId=1
+  @Get('results/rankings')
+  rankings(@Query('examId') examId: string, @Req() req: any) {
+    return this.examsService.rankings(Number(examId), req.user);
+  }
+
+  // GET /results/:id/report
+  @Get('results/:id/report')
+  resultReport(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any,
+  ) {
+    return this.examsService.resultReport(id, req.user);
   }
 
   @Get('results/:id')

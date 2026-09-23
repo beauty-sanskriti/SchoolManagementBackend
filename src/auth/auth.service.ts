@@ -9,7 +9,6 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 import { db } from '../prisma/db.js';
-import { RegisterDto } from './dto/register.dto/register.dto.js';
 import { VerificationService } from './verification/verification.service.js';
 
 @Injectable()
@@ -18,84 +17,6 @@ export class AuthService {
     private readonly verificationService: VerificationService,
     private readonly jwtService: JwtService,
   ) {}
-
-  async register(registerDto: RegisterDto) {
-    const existingUser = await db.orm.public.User
-      .where({
-        email: registerDto.email,
-      })
-      .first();
-
-    if (existingUser) {
-      throw new ConflictException(
-        'Email is already registered',
-      );
-    }
-
-    if (registerDto.phone) {
-      const existingPhone = await db.orm.public.User
-        .where({
-          phone: registerDto.phone,
-        })
-        .first();
-
-      if (existingPhone) {
-        throw new ConflictException(
-          'Phone number is already registered',
-        );
-      }
-    }
-
-    if (registerDto.username) {
-      const existingUsername =
-        await db.orm.public.User
-          .where({
-            username: registerDto.username,
-          })
-          .first();
-
-      if (existingUsername) {
-        throw new ConflictException(
-          'Username is already registered',
-        );
-      }
-    }
-
-    const hashedPassword = await bcrypt.hash(
-      registerDto.password,
-      10,
-    );
-
-    const user = await db.orm.public.User.create({
-      schoolId: registerDto.schoolId,
-      email: registerDto.email,
-      phone: registerDto.phone,
-      username: registerDto.username,
-      name: registerDto.name,
-      password: hashedPassword,
-      role: 'STUDENT',
-      emailVerified: false,
-      phoneVerified: false,
-    });
-
-    await this.verificationService.createOtp(
-      user.id,
-      'EMAIL',
-    );
-
-    return {
-      message:
-        'Registration successful. Please verify your email.',
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        username: user.username,
-        name: user.name,
-        role: user.role,
-      },
-    };
-  }
 
   async login(
     login: string,
@@ -152,11 +73,28 @@ export class AuthService {
       );
     }
 
+    let studentId: number | undefined;
+
+    if (user.role === 'STUDENT') {
+      const student = await db.orm.public.Student
+        .where({
+          userId: user.id,
+        })
+        .first();
+
+      studentId = student?.id;
+    }
+
     const payload = {
       sub: user.id,
-      schoolId: user.schoolId,
+      ...(user.schoolId !== null && {
+        schoolId: user.schoolId,
+      }),
       role: user.role,
       tokenType: 'access',
+      ...(studentId !== undefined && {
+        studentId,
+      }),
     };
 
     const accessToken =
@@ -198,7 +136,7 @@ export class AuthService {
 
     const verification =
       await this.verificationService.createOtp(
-        user.id,
+        user.email,
         'EMAIL',
       );
 
@@ -349,8 +287,9 @@ export class AuthService {
       const payload =
         await this.jwtService.verifyAsync<{
           sub: number;
-          schoolId: number;
+          schoolId?: number;
           role: string;
+          studentId?: number;
           tokenType?: string;
         }>(refreshToken);
 
@@ -365,8 +304,13 @@ export class AuthService {
       const newAccessToken =
         await this.jwtService.signAsync({
           sub: payload.sub,
-          schoolId: payload.schoolId,
+          ...(payload.schoolId !== undefined && {
+            schoolId: payload.schoolId,
+          }),
           role: payload.role,
+          ...(payload.studentId !== undefined && {
+            studentId: payload.studentId,
+          }),
           tokenType: 'access',
         });
 
@@ -398,11 +342,28 @@ export class AuthService {
       );
     }
 
+    let studentId: number | undefined;
+
+    if (user.role === 'STUDENT') {
+      const student = await db.orm.public.Student
+        .where({
+          userId: user.id,
+        })
+        .first();
+
+      studentId = student?.id;
+    }
+
     return this.jwtService.signAsync(
       {
         sub: user.id,
-        schoolId: user.schoolId,
+        ...(user.schoolId !== null && {
+          schoolId: user.schoolId,
+        }),
         role: user.role,
+        ...(studentId !== undefined && {
+          studentId,
+        }),
         tokenType: 'refresh',
       },
       {

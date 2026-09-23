@@ -72,7 +72,7 @@ export class AttendanceController {
     return this.attendanceService.classAttendance(id, req.user);
   }
 
-  @Get('attendance/:id')
+  // GET /attendance/analytics
   findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.attendanceService.findOne(id, req.user);
   }
@@ -89,5 +89,23 @@ export class AttendanceController {
   @Delete('attendance/:id')
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.attendanceService.remove(id, req.user);
+  }
+
+  // POST /attendance/qr
+  @Post('attendance/qr')
+  markByQr(@Body() dto: any, @Req() req: any) {
+    return this.attendanceService.markByDevice(dto, 'QR', req.user);
+  }
+
+  // POST /attendance/face
+  @Post('attendance/face')
+  markByFace(@Body() dto: any, @Req() req: any) {
+    return this.attendanceService.markByDevice(dto, 'FACE', req.user);
+  }
+
+  // POST /attendance/rfid
+  @Post('attendance/rfid')
+  markByRfid(@Body() dto: any, @Req() req: any) {
+    return this.attendanceService.markByDevice(dto, 'RFID', req.user);
   }
 }

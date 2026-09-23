@@ -435,8 +435,6 @@ export class FeesService {
         status: dto.transactionId
           ? 'SUCCESS'
           : 'PENDING',
-        paymentMethod:
-          dto.paymentMethod,
       });
 
     if (
@@ -601,7 +599,7 @@ export class FeesService {
         amount: payment.amount,
         status: payment.status,
         paymentMethod:
-          payment.paymentMethod,
+          (payment as any).paymentMethod,
         paidAt: payment.createdAt,
       },
       student: student
@@ -748,6 +746,84 @@ export class FeesService {
       message:
         'Payment verified successfully',
       payment: updatedPayment,
+    };
+  }
+
+  // POST /payments/refund
+  async refundPayment(
+    paymentId: number,
+    amount: number | undefined,
+    currentUser: any,
+  ) {
+    const payment = await db.orm.public.Payment
+      .where({ id: paymentId })
+      .first();
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== 'SUCCESS') {
+      throw new BadRequestException(
+        'Only successful payments can be refunded',
+      );
+    }
+
+    const refundAmount = amount ?? payment.amount;
+
+    await db.orm.public.Payment
+      .where({ id: paymentId })
+      .update({ status: 'REFUNDED' });
+
+    if (payment.studentFeeId) {
+      const studentFee = await db.orm.public.StudentFee
+        .where({ id: payment.studentFeeId })
+        .first();
+
+      if (studentFee) {
+        const paidAmount = Math.max(
+          0,
+          studentFee.paidAmount - refundAmount,
+        );
+
+        await db.orm.public.StudentFee
+          .where({ id: studentFee.id })
+          .update({
+            paidAmount,
+            status: paidAmount === 0 ? 'PENDING' : 'PARTIAL',
+          });
+      }
+    }
+
+    return {
+      message: 'Payment refunded successfully',
+      refundAmount,
+    };
+  }
+
+  // GET /payments/analytics
+  async paymentsAnalytics(currentUser: any) {
+    const payments = await db.orm.public.Payment.all();
+
+    const totalCollected = payments
+      .filter((p) => p.status === 'SUCCESS')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const totalRefunded = payments
+      .filter((p) => p.status === 'REFUNDED')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const byStatus: Record<string, number> = {};
+
+    for (const payment of payments) {
+      byStatus[payment.status] = (byStatus[payment.status] ?? 0) + 1;
+    }
+
+    return {
+      totalPayments: payments.length,
+      totalCollected,
+      totalRefunded,
+      byStatus,
     };
   }
 }

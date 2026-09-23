@@ -227,21 +227,18 @@ export class UsersService {
       );
     }
 
-    // Prevent deleting yourself
     if (existingUser.id === currentUser.userId) {
       throw new ForbiddenException(
         'You cannot delete your own account',
       );
     }
 
-    // Delete verification / OTP records first
     await db.orm.public.Verification
       .where({
         userId: id,
       })
       .delete();
 
-    // Delete the user
     await db.orm.public.User
       .where({
         id,
@@ -410,7 +407,6 @@ export class UsersService {
     }
   }
 
-  // Common duplicate error handler
   private handleUserConflict(
     error: any,
   ): never {

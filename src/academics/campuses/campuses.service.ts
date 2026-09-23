@@ -21,8 +21,6 @@ export class CampusesService {
     const schoolId =
       createCampusDto.schoolId;
 
-    // School Admin can only create
-    // campus for their own school
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       schoolId !== currentUser.schoolId
@@ -32,7 +30,6 @@ export class CampusesService {
       );
     }
 
-    // Check whether school exists
     const school =
       await db.orm.public.School
         .where({
@@ -46,8 +43,6 @@ export class CampusesService {
       );
     }
 
-    // Check duplicate campus code
-    // inside the same school
     const existingCampus =
       await db.orm.public.Campus
         .where({
@@ -77,13 +72,10 @@ export class CampusesService {
   async getCampuses(
     currentUser: any,
   ) {
-    // Super Admin can see all campuses
     if (currentUser.role === 'SUPER_ADMIN') {
       return db.orm.public.Campus.all();
     }
 
-    // School Admin can only see
-    // campuses of their own school
     return db.orm.public.Campus
       .where({
         schoolId: currentUser.schoolId,
@@ -109,8 +101,6 @@ export class CampusesService {
       );
     }
 
-    // School Admin can only access
-    // their own school's campus
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       campus.schoolId !== currentUser.schoolId
@@ -142,8 +132,6 @@ export class CampusesService {
       );
     }
 
-    // School Admin can only update
-    // their own school's campus
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       existingCampus.schoolId !==
@@ -154,7 +142,6 @@ export class CampusesService {
       );
     }
 
-    // Check duplicate campus code
     if (updateCampusDto.code) {
       const existingWithSameCode =
         await db.orm.public.Campus
@@ -205,8 +192,6 @@ export class CampusesService {
       );
     }
 
-    // School Admin can only delete
-    // their own school's campus
     if (
       currentUser.role === 'SCHOOL_ADMIN' &&
       existingCampus.schoolId !==

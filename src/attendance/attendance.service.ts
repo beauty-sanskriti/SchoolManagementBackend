@@ -273,4 +273,103 @@ export class AttendanceService {
 
     return attendance.filter((record) => studentIds.has(record.studentId));
   }
+
+  // POST /attendance/qr,
+  async markByDevice(
+    dto: CreateAttendanceDto & { deviceId?: string; latitude?: number; longitude?: number },
+    method: 'QR' | 'FACE' | 'RFID',
+    user: any,
+  ) {
+    const schoolId = this.getSchoolId(user);
+
+    this.validateStatus(dto.status ?? 'PRESENT');
+
+    await this.validateStudent(
+      dto.studentId,
+      dto.classId,
+      dto.sectionId,
+      schoolId,
+    );
+
+    const existing = await db.orm.public.Attendance.where({
+      studentId: dto.studentId,
+      date: dto.date,
+    }).first();
+
+    if (existing) {
+      return db.orm.public.Attendance.where({ id: existing.id }).update({
+        status: dto.status ?? 'PRESENT',
+        method,
+        deviceId: dto.deviceId,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+      });
+    }
+
+    return db.orm.public.Attendance.create({
+      studentId: dto.studentId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      date: dto.date,
+      status: dto.status ?? 'PRESENT',
+      method,
+      deviceId: dto.deviceId,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+    });
+  }
+
+  // GET /attendance/analytics
+  async analytics(user: any) {
+    const schoolId = this.getSchoolId(user);
+
+    const students = await db.orm.public.Student.where({ schoolId }).all();
+    const studentIds = new Set(students.map((s) => s.id));
+
+    const all = await db.orm.public.Attendance.all();
+    const records = all.filter((r) => studentIds.has(r.studentId));
+
+    const byStatus: Record<string, number> = {};
+
+    for (const record of records) {
+      byStatus[record.status] = (byStatus[record.status] ?? 0) + 1;
+    }
+
+    return {
+      totalRecords: records.length,
+      byStatus,
+    };
+  }
+
+  // GET /attendance/alerts
+  async alerts(user: any) {
+    const schoolId = this.getSchoolId(user);
+
+    const students = await db.orm.public.Student.where({ schoolId }).all();
+    const studentIds = new Set(students.map((s) => s.id));
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+
+    const all = await db.orm.public.Attendance.all();
+    const recent = all.filter(
+      (r) =>
+        studentIds.has(r.studentId) &&
+        (r.status === 'ABSENT' || r.status === 'LATE') &&
+        new Date(r.date) >= cutoff,
+    );
+
+    const counts: Record<number, number> = {};
+
+    for (const record of recent) {
+      counts[record.studentId] = (counts[record.studentId] ?? 0) + 1;
+    }
+
+    return Object.entries(counts)
+      .filter(([, count]) => count >= 3)
+      .map(([studentId, count]) => ({
+        studentId: Number(studentId),
+        absentOrLateCount: count,
+      }));
+  }
 }

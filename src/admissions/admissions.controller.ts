@@ -81,4 +81,31 @@ export class AdmissionsController {
       req.user,
     );
   }
+
+  // POST /admissions/:id/approve
+  @Post(':id/approve')
+  approve(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.admissionsService.approve(id, req.user);
+  }
+
+  // POST /admissions/:id/reject
+  @Post(':id/reject')
+  reject(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.admissionsService.reject(id, req.user);
+  }
+
+  // POST /admissions/:id/create-account
+  @Post(':id/create-account')
+  createAccount(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.admissionsService.createAccount(id, req.user);
+  }
 }

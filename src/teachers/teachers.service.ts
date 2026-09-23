@@ -319,4 +319,67 @@ export class TeachersService {
       );
     }
   }
+
+  // POST /teachers/:id/generate-account
+  async generateAccount(
+    id: number,
+    currentUser: any,
+  ) {
+    const teacher = await this.getTeacher(
+      id,
+      currentUser,
+    );
+
+    if (teacher.userId) {
+      throw new ConflictException(
+        'This teacher already has a linked account',
+      );
+    }
+
+    throw new ConflictException(
+      'Teacher has no email on file to create an account with; use POST /teachers/invite instead',
+    );
+  }
+
+  // GET /teachers/:id/salary
+  async getSalary(
+    id: number,
+    currentUser: any,
+  ) {
+    const teacher = await this.getTeacher(
+      id,
+      currentUser,
+    );
+
+    if (
+      currentUser.role === 'TEACHER' &&
+      teacher.userId !== currentUser.userId
+    ) {
+      throw new ForbiddenException(
+        'You can only view your own salary details',
+      );
+    }
+
+    const employee = await db.orm.public.Employee
+      .where({
+        schoolId: teacher.schoolId,
+        employeeNo: teacher.employeeNo,
+      })
+      .first();
+
+    if (!employee) {
+      return {
+        message: 'No payroll record found for this teacher yet',
+        payslips: [],
+      };
+    }
+
+    const payslips = await db.orm.public.Payroll
+      .where({
+        employeeId: employee.id,
+      })
+      .all();
+
+    return { employee, payslips };
+  }
 }

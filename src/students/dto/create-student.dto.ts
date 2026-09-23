@@ -1,15 +1,25 @@
 import {
   IsDateString,
+  IsEmail,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
 
 export class CreateStudentDto {
-  @IsInt()
-  schoolId: number;
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
   @IsOptional()
   @IsInt()

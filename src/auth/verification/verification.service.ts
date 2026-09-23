@@ -20,7 +20,7 @@ export class VerificationService {
   }
 
   async createOtp(
-    userId: number,
+    email: string,
     type: 'EMAIL' | 'PHONE',
   ) {
     if (type !== 'EMAIL') {
@@ -30,17 +30,11 @@ export class VerificationService {
     }
 
     const user = await db.orm.public.User
-      .where({ id: userId })
+      .where({ email })
       .first();
 
     if (!user) {
       throw new BadRequestException('User not found');
-    }
-
-    if (!user.email) {
-      throw new BadRequestException(
-        'User email is not available',
-      );
     }
 
     const otp = this.generateOtp();
@@ -51,7 +45,7 @@ export class VerificationService {
 
     const verification =
       await db.orm.public.Verification.create({
-        userId,
+        userId: user.id,
         otp,
         type,
         expiresAt,
@@ -98,14 +92,25 @@ export class VerificationService {
   }
 
   async verifyOtp(
-    userId: number,
+    email: string,
     otp: string,
     type: 'EMAIL' | 'PHONE',
   ) {
+    const user = await db.orm.public.User
+      .where({ email })
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found',
+      };
+    }
+
     const verification =
       await db.orm.public.Verification
         .where({
-          userId,
+          userId: user.id,
           otp,
           type,
           verified: false,
@@ -137,7 +142,7 @@ export class VerificationService {
 
     if (type === 'EMAIL') {
       await db.orm.public.User
-        .where({ id: userId })
+        .where({ id: user.id })
         .update({
           emailVerified: true,
         });
@@ -145,7 +150,7 @@ export class VerificationService {
 
     if (type === 'PHONE') {
       await db.orm.public.User
-        .where({ id: userId })
+        .where({ id: user.id })
         .update({
           phoneVerified: true,
         });

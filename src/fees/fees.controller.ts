@@ -153,6 +153,12 @@ export class FeesController {
     );
   }
 
+  // GET /payments/analytics
+  @Get('payments/analytics')
+  paymentsAnalytics(@Req() req: any) {
+    return this.feesService.paymentsAnalytics(req.user);
+  }
+
   @Get('payments/:id/receipt')
   getReceipt(
     @Param('id', ParseIntPipe) id: number,
@@ -171,6 +177,19 @@ export class FeesController {
   ) {
     return this.feesService.findOnePayment(
       id,
+      req.user,
+    );
+  }
+
+  @Patch('payments/:id')
+  updatePayment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePaymentDto,
+    @Req() req: any,
+  ) {
+    return this.feesService.updatePayment(
+      id,
+      dto,
       req.user,
     );
   }
@@ -195,5 +214,15 @@ export class FeesController {
       dto,
       req.user,
     );
+  }
+
+  // POST /payments/refund
+  @Post('payments/refund')
+  refundPayment(
+    @Body('paymentId', ParseIntPipe) paymentId: number,
+    @Body('amount') amount: number | undefined,
+    @Req() req: any,
+  ) {
+    return this.feesService.refundPayment(paymentId, amount, req.user);
   }
 }
